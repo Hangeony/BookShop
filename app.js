@@ -9,4 +9,4 @@ app.listen(process.env.PORT);
 app.use(express.json());
 console.log(`${process.env.PORT}서버 실행중`);
 
-app.use("/users", routers);
+app.use("/", routers);
