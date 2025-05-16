@@ -41,7 +41,6 @@ export const allBooks = (req, res) => {
     INNER JOIN category c ON b.category_id = c.id
     WHERE b.category_id = ?
       AND b.pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()
-    ORDER BY b.pub_date DESC
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [category_id, limit, offset]);
@@ -53,7 +52,6 @@ export const allBooks = (req, res) => {
     FROM books b
     INNER JOIN category c ON b.category_id = c.id
     WHERE b.category_id = ?
-    ORDER BY b.pub_date DESC
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [category_id, limit, offset]);
@@ -61,14 +59,12 @@ export const allBooks = (req, res) => {
     const sql = `
     SELECT * FROM books
     WHERE pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()
-    ORDER BY pub_date DESC
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [limit, offset]);
   } else {
     const sql = `
     SELECT * FROM books
-    ORDER BY pub_date DESC
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [limit, offset]);
