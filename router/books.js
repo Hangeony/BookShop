@@ -1,21 +1,12 @@
 import express from "express";
-
+import { allBooks, datailBook } from "../controller/bookController.js";
 const router = express.Router();
 
-// 도서 전체 조회
-router.get("/", (req, res) => {
-  res.send("전체 도서 조회");
-});
+// 도서 전체 조회 및 카테고리 구분
+router.get("/", allBooks);
 
 // 개별 도서 조회
-router.get("/:id", (req, res) => {
-  res.send("개별 도서 조회");
-});
-
-// 카테고리별 도서 목록 조회
-router.get("/", (req, res) => {
-  res.send("비밀번호 초기화 요청");
-});
+router.get("/:id", datailBook);
 
 const bookApi = router;
 export default bookApi;

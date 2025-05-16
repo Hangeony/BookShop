@@ -44,7 +44,14 @@ export const loginUser = (req, res) => {
     }
 
     const loginUser = results[0];
-    if (loginUser && loginUser.password === password) {
+
+    // salt값 꺼내서 날 것으로 들어온 비밀번호 암호화 해보고
+    const hashpwd = crypto
+      .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
+      .toString("base64");
+
+    // DB에 저장되어 있는 것 비교
+    if (loginUser && loginUser.password === hashpwd) {
       const token = jwt.sign(
         {
           email: loginUser.email,
@@ -100,8 +107,14 @@ export const passwordResetRequset = (req, res) => {
 export const passwordRest = (req, res) => {
   const { email, password } = req.body;
 
-  let sql = "UPDATE users SET password =? WHERE email = ?";
-  let values = [password, email];
+  // 암호화된 비밀번호를 같이 DB에 저장
+  const salt = crypto.randomBytes(10).toString("base64");
+  const hashPwd = crypto
+    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+    .toString("base64");
+
+  let sql = "UPDATE users SET password =?, salt=? WHERE email = ?";
+  let values = [hashPwd, salt, email];
 
   connection.query(sql, values, (err, results) => {
     if (err) {
