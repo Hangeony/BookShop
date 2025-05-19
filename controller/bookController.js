@@ -34,9 +34,11 @@ export const allBooks = (req, res) => {
 
   if (category_id && new_books) {
     const sql = `
-    SELECT b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail,
-           b.author, b.pages, b.contents, b.price, b.pub_date,
-           c.name AS category
+     SELECT 
+      b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail,
+      b.author, b.pages, b.contents, b.price, b.pub_date,
+      c.name AS category,
+      (SELECT COUNT(*) FROM likes WHERE liked_book_id = b.id) AS likes
     FROM books b
     INNER JOIN category c ON b.category_id = c.id
     WHERE b.category_id = ?
@@ -46,9 +48,11 @@ export const allBooks = (req, res) => {
     runQuery(sql, [category_id, limit, offset]);
   } else if (category_id) {
     const sql = `
-    SELECT b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail,
-           b.author, b.pages, b.contents, b.price, b.pub_date,
-           c.name AS category
+     SELECT 
+      b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail,
+      b.author, b.pages, b.contents, b.price, b.pub_date,
+      c.name AS category,
+      (SELECT COUNT(*) FROM likes WHERE liked_book_id = b.id) AS likes
     FROM books b
     INNER JOIN category c ON b.category_id = c.id
     WHERE b.category_id = ?
@@ -57,14 +61,20 @@ export const allBooks = (req, res) => {
     runQuery(sql, [category_id, limit, offset]);
   } else if (new_books) {
     const sql = `
-    SELECT * FROM books
-    WHERE pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()
+    SELECT 
+      b.*, 
+      (SELECT COUNT(*) FROM likes WHERE liked_book_id = b.id) AS likes
+    FROM books b
+    WHERE b.pub_date BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [limit, offset]);
   } else {
     const sql = `
-    SELECT * FROM books
+   SELECT 
+      b.*, 
+      (SELECT COUNT(*) FROM likes WHERE liked_book_id = b.id) AS likes
+    FROM books b
     LIMIT ? OFFSET ?
   `;
     runQuery(sql, [limit, offset]);
@@ -75,8 +85,15 @@ export const allBooks = (req, res) => {
 export const datailBook = (req, res) => {
   let { id } = req.params;
 
-  const sql = `SELECT b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail, b.author, b.pages, b.contents, b.price, b.pub_date, c.name AS category
-  FROM books b INNER JOIN category c ON b.category_id = c.id WHERE b.id = ?;
+  const sql = `
+   SELECT 
+    b.id, b.title, b.img, b.form, b.isbn, b.summary, b.detail,
+    b.author, b.pages, b.contents, b.price, b.pub_date,
+    c.name AS category,
+    (SELECT COUNT(*) FROM likes WHERE liked_book_id = b.id) AS likes
+  FROM books b
+  INNER JOIN category c ON b.category_id = c.id
+  WHERE b.id = ?;
 `;
   connection.query(sql, id, (err, result) => {
     if (err) {
