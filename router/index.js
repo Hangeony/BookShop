@@ -11,7 +11,7 @@ const routers = express.Router();
 routers.use("/users", userApi);
 routers.use("/books", bookApi);
 routers.use("/likes", likeApi);
-routers.use("/cart", cartApi);
+routers.use("/carts", cartApi);
 routers.use("/orders", orderApi);
 routers.use("/category", categoryApi);
 

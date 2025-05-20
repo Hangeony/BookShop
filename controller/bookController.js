@@ -81,7 +81,6 @@ export const allBooks = (req, res) => {
   }
 };
 
-// 전체 도서 조회
 export const datailBook = (req, res) => {
   let { id } = req.params;
 
