@@ -6,129 +6,158 @@ import crypto from "crypto";
 
 dotenv.config();
 
-export const joinUser = (req, res) => {
+// ✅ 회원가입
+export const joinUser = async (req, res) => {
   const { email, password } = req.body;
-  console.log(`요청 바디:, ${req.body}`);
+  console.log("📩 [회원가입] 요청 바디:", req.body);
 
-  //password 암호화 해서 salt 값과 db에 저장하기
-  const salt = crypto.randomBytes(10).toString("base64");
-  const hashPwd = crypto
-    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-    .toString("base64");
+  if (!email || !password) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "이메일과 비밀번호를 모두 입력해주세요." });
+  }
 
-  let sql = "INSERT INTO users(email, password, salt) VALUES (?, ?, ?)";
-  let values = [email, hashPwd, salt];
+  try {
+    const [existing] = await connection.query(
+      "SELECT id FROM users WHERE email = ?",
+      [email]
+    );
 
-  connection.query(sql, values, (err, results) => {
-    if (err) {
-      console.log(err);
+    if (existing.length > 0) {
       return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "err발생", err });
-    }
-    console.log(`salt 값 출력 ${salt}`);
-    return res.status(StatusCodes.CREATED).json({ results });
-  });
-};
-
-export const loginUser = (req, res) => {
-  const { email, password } = req.body;
-
-  let sql = "SELECT * FROM users WHERE email =?";
-  connection.query(sql, email, (err, results) => {
-    if (err) {
-      console.log(err);
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "err발생", err });
+        .status(StatusCodes.CONFLICT)
+        .json({ message: "이미 가입된 이메일입니다." });
     }
 
-    const loginUser = results[0];
-
-    // salt값 꺼내서 날 것으로 들어온 비밀번호 암호화 해보고
-    const hashpwd = crypto
-      .pbkdf2Sync(password, loginUser.salt, 10000, 10, "sha512")
+    const salt = crypto.randomBytes(10).toString("base64");
+    const hashPwd = crypto
+      .pbkdf2Sync(password, salt, 10000, 10, "sha512")
       .toString("base64");
 
-    // DB에 저장되어 있는 것 비교
-    if (loginUser && loginUser.password === hashpwd) {
-      const token = jwt.sign(
-        {
-          email: loginUser.email,
-        },
-        process.env.PRIVATE_KEY,
-        {
-          expiresIn: "5m",
-          issuer: "songa",
-        }
-      );
+    const [result] = await connection.query(
+      "INSERT INTO users(email, password, salt) VALUES (?, ?, ?)",
+      [email, hashPwd, salt]
+    );
 
-      res.cookie("token", token, {
-        httpOnly: true,
-      });
-
-      console.log(`reqEmail확인: ${req.body.email}`);
-      console.log(`token확인: ${token}`);
-
-      return res.status(StatusCodes.OK).json(results);
-    } else {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ message: "비밀번호 혹은 이메일이 존재하지 않습니다." });
-    }
-  });
+    return res.status(StatusCodes.CREATED).json({
+      message: "회원가입 완료",
+      userId: result.insertId,
+    });
+  } catch (err) {
+    console.error("❌ 회원가입 실패:", err);
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: "DB 오류", error: err });
+  }
 };
 
-export const passwordResetRequset = (req, res) => {
-  const { email } = req.body;
-
-  let sql = "SELECT * FROM users WHERE email =?";
-  connection.query(sql, email, (err, results) => {
-    if (err) {
-      console.log(err);
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "err발생", err });
-    }
-    // 이메일로 유저가 있는지 찾아봄
-    const user = results[0];
-    if (user) {
-      return res.status(StatusCodes.OK).json({
-        email: email,
-      });
-    } else {
-      return res
-        .status(StatusCodes.UNAUTHORIZED)
-        .json({ message: "요청하신 이메일이 없습니다." });
-    }
-  });
-};
-
-export const passwordRest = (req, res) => {
+// ✅ 로그인
+export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  // 암호화된 비밀번호를 같이 DB에 저장
-  const salt = crypto.randomBytes(10).toString("base64");
-  const hashPwd = crypto
-    .pbkdf2Sync(password, salt, 10000, 10, "sha512")
-    .toString("base64");
+  try {
+    const [rows] = await connection.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
 
-  let sql = "UPDATE users SET password =?, salt=? WHERE email = ?";
-  let values = [hashPwd, salt, email];
-
-  connection.query(sql, values, (err, results) => {
-    if (err) {
-      console.log(err);
+    const user = rows[0];
+    if (!user) {
       return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ message: "err발생", err });
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "존재하지 않는 이메일입니다." });
     }
-    if (results.affectedRows == 0) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        message: "이메일이 잘 못 된거같은데요 ?",
-      });
-    } else {
-      return res.status(StatusCodes.OK).json(results);
+
+    const hashPwd = crypto
+      .pbkdf2Sync(password, user.salt, 10000, 10, "sha512")
+      .toString("base64");
+
+    if (hashPwd !== user.password) {
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "비밀번호가 일치하지 않습니다." });
     }
-  });
+
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      process.env.PRIVATE_KEY,
+      {
+        expiresIn: "5m",
+        issuer: "songa",
+      }
+    );
+
+    res.cookie("token", token, { httpOnly: true });
+
+    return res.status(StatusCodes.OK).json({
+      message: "로그인 성공",
+      email: user.email,
+    });
+  } catch (err) {
+    console.error("❌ 로그인 오류:", err);
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: "로그인 중 오류", error: err });
+  }
+};
+
+// ✅ 비밀번호 재설정 요청
+export const passwordResetRequset = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const [results] = await connection.query(
+      "SELECT id FROM users WHERE email = ?",
+      [email]
+    );
+
+    if (results.length === 0) {
+      return res
+        .status(StatusCodes.UNAUTHORIZED)
+        .json({ message: "해당 이메일이 존재하지 않습니다." });
+    }
+
+    return res.status(StatusCodes.OK).json({ message: "이메일 확인 완료" });
+  } catch (err) {
+    console.error("❌ 이메일 확인 오류:", err);
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: "DB 오류", error: err });
+  }
+};
+
+// ✅ 비밀번호 재설정
+export const passwordRest = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "이메일과 새로운 비밀번호가 필요합니다." });
+  }
+
+  try {
+    const salt = crypto.randomBytes(10).toString("base64");
+    const hashPwd = crypto
+      .pbkdf2Sync(password, salt, 10000, 10, "sha512")
+      .toString("base64");
+
+    const [result] = await connection.query(
+      "UPDATE users SET password = ?, salt = ? WHERE email = ?",
+      [hashPwd, salt, email]
+    );
+
+    if (result.affectedRows === 0) {
+      return res
+        .status(StatusCodes.NOT_FOUND)
+        .json({ message: "해당 이메일을 찾을 수 없습니다." });
+    }
+
+    return res.status(StatusCodes.OK).json({ message: "비밀번호 변경 완료" });
+  } catch (err) {
+    console.error("❌ 비밀번호 변경 오류:", err);
+    return res
+      .status(StatusCodes.INTERNAL_SERVER_ERROR)
+      .json({ message: "비밀번호 변경 중 오류", error: err });
+  }
 };
